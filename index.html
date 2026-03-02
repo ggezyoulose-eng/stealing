@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<title>STEAL A MEME</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0015;touch-action:none;user-select:none;font-family:'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent;}
+#c{position:fixed;inset:0;width:100%;height:100%;}
+
+/* ─ HUD ─ */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:20;}
+#topbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:2px solid #ff6b35;border-radius:30px;padding:5px 16px;display:flex;gap:10px;align-items:center;white-space:nowrap;backdrop-filter:blur(8px);}
+#t-title{color:#ff6b35;letter-spacing:2px;font-size:.72rem;font-weight:900;}
+#t-money{color:#ffcc02;font-weight:700;font-size:.9rem;min-width:65px;text-align:center;}
+#t-income{color:#00ff88;font-size:.7rem;font-weight:600;}
+#t-rebirth{color:#ff88ff;font-size:.7rem;font-weight:700;}
+#stolen-hud{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.85);border:2px solid #00ff88;border-radius:10px;padding:3px 9px;color:#00ff88;font-weight:700;font-size:.73rem;}
+#carrying-hud{position:absolute;top:52px;left:50%;transform:translateX(-50%);background:rgba(255,0,80,.2);border:2px solid #ff0055;border-radius:10px;padding:4px 13px;color:#ff0055;font-weight:700;font-size:.8rem;display:none;}
+#big-msg{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);font-size:clamp(1.2rem,5vw,2.3rem);font-weight:900;text-shadow:0 0 16px currentColor;opacity:0;pointer-events:none;text-align:center;transition:opacity .2s;white-space:nowrap;}
+#prompt{position:absolute;bottom:208px;left:50%;transform:translateX(-50%);background:rgba(255,204,2,.16);border:2px solid #ffcc02;border-radius:10px;padding:5px 16px;color:#ffcc02;font-weight:700;font-size:.84rem;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;}
+#lockbar-wrap{position:absolute;bottom:194px;left:50%;transform:translateX(-50%);width:160px;text-align:center;}
+#lockbar-label{color:#ff6b35;font-size:.63rem;font-weight:700;margin-bottom:2px;}
+#lockbar-bg{background:rgba(255,255,255,.1);border-radius:4px;height:5px;}
+#lockbar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#ff6b35,#ffcc02);transition:width .15s;}
+#notifs{position:absolute;top:52px;right:8px;display:flex;flex-direction:column;gap:4px;align-items:flex-end;max-width:220px;}
+.notif{background:rgba(0,0,0,.9);border-radius:8px;padding:4px 9px;font-size:.72rem;font-weight:700;border-left:3px solid #fff;animation:nI .2s ease,nO .3s 2.7s forwards;}
+@keyframes nI{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+@keyframes nO{to{opacity:0}}
+
+/* ─ REBIRTH BUTTON ─ */
+#rebirth-btn{position:absolute;top:10px;right:10px;background:linear-gradient(135deg,#ff44ff,#8800cc);border:2px solid #ff88ff;border-radius:12px;padding:5px 11px;color:#fff;font-weight:700;font-size:.72rem;cursor:pointer;pointer-events:all;display:none;z-index:25;}
+#rebirth-btn:active{transform:scale(.93);}
+
+/* ─ ZUKAN BUTTON ─ */
+#zukan-btn{position:absolute;bottom:200px;right:10px;background:rgba(0,0,0,.85);border:2px solid #66aaff;border-radius:12px;padding:6px 11px;color:#66aaff;font-weight:700;font-size:.72rem;cursor:pointer;pointer-events:all;z-index:25;}
+#zukan-btn:active{transform:scale(.93);}
+
+/* ─ ZUKAN PANEL ─ */
+#zukan-panel{position:fixed;inset:0;background:rgba(0,0,15,.95);z-index:80;display:none;flex-direction:column;padding:16px;}
+#zukan-panel h2{color:#66aaff;text-align:center;font-size:1.2rem;margin-bottom:8px;}
+#zukan-progress{text-align:center;color:#aaa;font-size:.78rem;margin-bottom:10px;}
+#zukan-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;overflow-y:auto;flex:1;}
+.zk-cell{background:rgba(255,255,255,.06);border-radius:8px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.5rem;border:1px solid rgba(255,255,255,.1);position:relative;}
+.zk-cell.got{border-color:#ffcc02;}
+.zk-cell.got::after{content:'';position:absolute;inset:0;border-radius:8px;background:rgba(255,204,2,.08);}
+.zk-cell .zk-name{font-size:.5rem;color:#888;margin-top:2px;font-weight:600;}
+.zk-cell.got .zk-name{color:#ffcc02;}
+.zk-cell.locked-cell{filter:brightness(.2);}
+#zukan-close{background:rgba(255,255,255,.1);border:1px solid #555;border-radius:10px;color:#fff;padding:10px;font-size:.9rem;font-weight:700;cursor:pointer;margin-top:10px;pointer-events:all;}
+
+/* ─ TUTORIAL ─ */
+#tutorial{position:fixed;inset:0;z-index:50;pointer-events:none;}
+.tut-box{position:absolute;background:rgba(0,0,10,.93);border:2px solid #ffcc02;border-radius:14px;padding:11px 15px;color:#fff;font-size:.8rem;font-weight:600;line-height:1.65;max-width:240px;pointer-events:none;}
+.tut-arr{font-size:1.4rem;animation:tb .7s infinite alternate;}
+@keyframes tb{from{transform:translateY(0)}to{transform:translateY(-6px)}}
+
+/* ─ CONTROLS ─ */
+#controls{position:fixed;bottom:0;left:0;right:0;height:184px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 13px 13px;z-index:30;pointer-events:none;}
+.jzone{border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.2);position:relative;pointer-events:all;touch-action:none;flex-shrink:0;}
+#jmove{width:116px;height:116px;}
+#jcam{width:106px;height:106px;}
+.jknob{border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+#jmove-k{width:46px;height:46px;background:rgba(255,107,53,.88);border:3px solid #ff6b35;}
+#jcam-k{width:40px;height:40px;background:rgba(100,180,255,.65);border:2px solid #64c8ff;}
+#btns{display:flex;flex-direction:column;gap:7px;pointer-events:all;align-items:center;padding-bottom:3px;}
+.abtn{border:none;border-radius:50%;font-weight:700;cursor:pointer;touch-action:none;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.2;font-size:.7rem;transition:transform .1s;-webkit-tap-highlight-color:transparent;}
+.abtn:active{transform:scale(.87);}
+#btn-act{width:62px;height:62px;background:rgba(255,204,2,.25);border:3px solid #ffcc02;color:#ffcc02;display:none;}
+#btn-jump{width:50px;height:50px;background:rgba(100,200,255,.2);border:2px solid #64c8ff;color:#64c8ff;}
+#btn-lock{width:46px;height:46px;background:rgba(255,100,50,.2);border:2px solid #ff6b35;color:#ff6b35;font-size:.65rem;}
+#zoom-hint{position:absolute;bottom:1px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.22);font-size:.56rem;pointer-events:none;}
+#pc-hint{position:fixed;bottom:4px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.18);font-size:.58rem;pointer-events:none;z-index:10;}
+
+/* ─ OVERLAY ─ */
+.ov{position:fixed;inset:0;background:rgba(5,0,20,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;color:#fff;text-align:center;padding:20px;}
+.ov h1{font-size:clamp(1.6rem,6vw,2.8rem);font-weight:900;margin-bottom:.4em;}
+.ov p{color:#aaa;font-size:.88rem;margin-bottom:1.3em;line-height:1.8;}
+.ov .sc{color:#ffcc02;font-size:1.3rem;font-weight:700;margin-bottom:1.3em;}
+.obtn{background:linear-gradient(135deg,#ff6b35,#ff2200);color:#fff;border:none;border-radius:14px;padding:13px 44px;font-size:1rem;font-weight:900;cursor:pointer;pointer-events:all;}
+.obtn:active{transform:scale(.96);}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="stolen-hud">🎭 <span id="sv">0</span> 匹</div>
+  <div id="topbar">
+    <span id="t-title">STEAL A MEME</span>
+    <span id="t-money">¥1,000</span>
+    <span style="color:#333">|</span>
+    <span id="t-income">+¥0/秒</span>
+    <span style="color:#333">|</span>
+    <span id="t-rebirth">🔄×0</span>
+  </div>
+  <div id="notifs"></div>
+  <div id="carrying-hud">🏃 運搬中！基地へ！</div>
+  <div id="big-msg"></div>
+  <div id="prompt"></div>
+  <div id="lockbar-wrap">
+    <div id="lockbar-label">🔒 基地ロック</div>
+    <div id="lockbar-bg"><div id="lockbar-fill" style="width:100%"></div></div>
+  </div>
+</div>
+
+<button id="rebirth-btn">🔄 リバース！</button>
+<button id="zukan-btn">📖 図鑑</button>
+
+<!-- ZUKAN PANEL -->
+<div id="zukan-panel">
+  <h2>📖 ミーム図鑑</h2>
+  <div id="zukan-progress"></div>
+  <div id="zukan-grid"></div>
+  <button id="zukan-close">✕ 閉じる</button>
+</div>
+
+<div id="tutorial"></div>
+
+<div id="controls">
+  <div class="jzone" id="jmove"><div class="jknob" id="jmove-k"></div></div>
+  <div id="btns">
+    <button class="abtn" id="btn-act">🎭<br>盗む</button>
+    <button class="abtn" id="btn-jump">↑<br>JMP</button>
+    <button class="abtn" id="btn-lock">🔒<br>LOCK</button>
+  </div>
+  <div class="jzone" id="jcam"><div class="jknob" id="jcam-k"></div></div>
+  <div id="zoom-hint">ピンチでズーム</div>
+</div>
+<div id="pc-hint">WASD/ドラッグ:視点/スクロール:ズーム/E:アクション/Space:JMP/L:ロック/G:図鑑</div>
+
+<div class="ov" id="ov-end" style="display:none">
+  <h1 style="color:#ff6b35">🎭 STEAL A MEME</h1>
+  <p id="ov-sub"></p>
+  <div class="sc" id="ov-score"></div>
+  <button class="obtn" id="btn-retry">🔄 もう一度</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════
+//  STEAL A MEME  ― Full Version with Rebirth & Zukan
+// ══════════════════════════════════════════════
+
+const WORLD=50, BASE_LOCK=25, BOT_RESP=40, CONV_SP=7;
+
+// Player base: bottom center, facing north (toward Z=0)
+const PBX=0, PBZ=WORLD-7;
+
+// Bot bases: 3 north of conveyor, 3 south — symmetrically placed, NO overlap with conveyor (Z=0)
+// North side: Z = -(WORLD-10) = -40
+// South side (excluding player base row): Z = +20
+const BOT_SLOTS=[
+  [-24, -(WORLD-10)],  // north-left
+  [  0, -(WORLD-10)],  // north-center
+  [ 24, -(WORLD-10)],  // north-right
+  [-24,  20],          // south-left
+  [  0,  20],          // south-center
+  [ 24,  20],          // south-right
+];
+
+const BOT_NAMES=['XxMeme69xX','PepeLord🐸','skibidi_god','nyan_hacker','brainrot_777','gigachad_99','trollface_pro','doge_master','SIGMA_BOY','ratio_king','trollge_boss','npc_farmer'];
+const BOT_COLS=[0x2255cc,0x22aa44,0xcc2222,0xcc7700,0x8833cc,0x009988,0xaa4400,0x005566];
+
+const RARITY=[
+  {n:'COMMON',   c:0xbbbbbb,lc:'#ccc',  w:42,iL:1,  iH:6,   pL:50,   pH:250   },
+  {n:'UNCOMMON', c:0x44cc44,lc:'#6f6',  w:26,iL:6,  iH:30,  pL:250,  pH:1200  },
+  {n:'RARE',     c:0x4499ff,lc:'#6bf',  w:15,iL:30, iH:120, pL:1200, pH:7000  },
+  {n:'EPIC',     c:0xcc44ff,lc:'#d8f',  w:9, iL:120,iH:500, pL:7000, pH:30000 },
+  {n:'LEGENDARY',c:0xffaa00,lc:'#fc6',  w:5, iL:500,iH:2000,pL:30000,pH:120000},
+  {n:'MYTHIC',   c:0xff2266,lc:'#f6a',  w:3, iL:2000,iH:8000,pL:120000,pH:500000},
+];
+
+// ── 160 unique named meme characters ────────────────────
+const CHARS=[
+  // each: [emoji, name, body_color, detail_color]
+  ['🐸','ペペ',0x44aa44,0x226622],['🤡','ピエロ',0xff3333,0xcc0000],['🦆','ダック',0xffcc00,0xff9900],
+  ['👺','オニ',0xff4400,0xcc2200],['🐶','ドギー',0xcc9944,0x886622],['👾','エイリアン',0x44ff44,0x228822],
+  ['💀','スカル',0xeeeeee,0xaaaaaa],['🦊','フォックス',0xff8833,0xcc5500],['🐙','タコ',0xff66aa,0xcc3377],
+  ['🎭','マスク',0xffcc00,0xcc9900],['🧠','ブレイン',0xff8899,0xcc5566],['🤖','ロボ',0x88ccff,0x4488cc],
+  ['🐱','ネコ',0xff9933,0xcc6600],['🐻','クマ',0x996633,0x663300],['🦁','ライオン',0xffcc44,0xcc9900],
+  ['🐯','トラ',0xff9900,0xcc6600],['🐺','オオカミ',0x888888,0x444444],['🦝','アライグマ',0x888888,0x555555],
+  ['🦄','ユニコーン',0xff88ff,0xcc44cc],['🐲','ドラゴン',0x44cc44,0x228822],['🦖','ティラノ',0x66aa44,0x448822],
+  ['🦕','ブラキオ',0x88cc88,0x448844],['🐉','神龍',0xffaa00,0xcc7700],['👻','ゴースト',0xeeeeff,0xaaaacc],
+  ['💩','ウンコ',0x885522,0x553311],['🤠','カウボーイ',0xddaa44,0x997722],['🥶','コオリ',0x88eeff,0x44aacc],
+  ['🥵','ホット',0xff5533,0xcc2200],['😈','デビル',0xaa22ff,0x770099],['👿','インプ',0xcc44ff,0x8800cc],
+  ['🤯','バクハツ',0xff6633,0xcc3300],['🥸','メガネ',0xddccaa,0x997755],['🤪','クレイジー',0xff88aa,0xcc4466],
+  ['😵','グルグル',0xff9988,0xcc5544],['🤑','マネー',0x44cc44,0x228822],['😂','ワラタ',0xffcc44,0xcc9900],
+  ['🤣','ローリング',0xffaa33,0xcc7700],['😱','ビビリ',0xffeecc,0xccaa88],['🤬','イカリ',0xff2233,0xcc0011],
+  ['🤢','オエー',0x88cc44,0x558822],['🤓','ガリ勉',0x4488ff,0x2255cc],['👽','宇宙人',0x88ff88,0x44cc44],
+  ['👹','オーガ',0xff4444,0xcc1111],['🐔','ニワトリ',0xffcc88,0xcc9944],['🦅','ワシ',0x886633,0x553300],
+  ['🦉','フクロウ',0x886644,0x553322],['🦇','コウモリ',0x554466,0x332244],['🐝','ハチ',0xffcc00,0xcc9900],
+  ['🦋','チョウ',0xff88ff,0xcc44cc],['🐌','カタツムリ',0x88aa44,0x556622],['🦗','コオロギ',0x448833,0x225511],
+  ['🕷','クモ',0x222222,0x111111],['🦂','サソリ',0xcc4400,0x882200],['🐢','カメ',0x44aa44,0x228822],
+  ['🐍','ヘビ',0x44cc44,0x228822],['🦎','トカゲ',0x44bb33,0x228811],['🐊','ワニ',0x338822,0x115500],
+  ['🐋','クジラ',0x4488cc,0x225599],['🦈','サメ',0x6699bb,0x335577],['🐬','イルカ',0x44aacc,0x227799],
+  ['🐡','フグ',0xffaa44,0xcc7722],['🦑','イカ',0xff88cc,0xcc4488],['🦞','エビ',0xff5533,0xcc2200],
+  ['🍕','ピザ',0xff9933,0xcc6600],['🍔','バーガー',0xcc8833,0x995511],['🌮','タコス',0xffcc44,0xcc9900],
+  ['🍣','スシ',0xffeecc,0xccaa88],['🍦','アイス',0xffffee,0xccccaa],['🎂','ケーキ',0xffaacc,0xcc6699],
+  ['🍩','ドーナツ',0xcc8844,0x995522],['🎮','ゲーム機',0x222244,0x111122],['🎯','ダーツ',0xff2233,0xcc0011],
+  ['🎲','サイコロ',0xffffff,0xcccccc],['💎','ダイヤ',0x88eeff,0x44aacc],['👑','クラウン',0xffcc00,0xcc9900],
+  ['🏆','トロフィー',0xffcc00,0xcc9900],['🥇','メダル',0xffcc00,0xcc9900],['🔮','クリスタル',0x8844ff,0x5522cc],
+  ['💫','スター',0xffee44,0xccbb00],['🌟','グロウ',0xffee66,0xccbb22],['✨','スパーク',0xffffff,0xeeeecc],
+  ['💥','エクスプロード',0xff6622,0xcc3300],['🔥','ファイア',0xff5522,0xcc2200],['🌈','レインボー',0xff88ff,0xcc44cc],
+  ['⚡','ライトニング',0xffee44,0xccbb00],['🚀','ロケット',0xaaaacc,0x777799],['🛸','UFO',0x88ccff,0x4488cc],
+  ['🌍','アース',0x44aacc,0x2277aa],['🪐','サターン',0xddcc88,0xaa9944],['🌙','ムーン',0xeedd99,0xbbaa66],
+  ['☀️','サン',0xffcc22,0xcc9900],['🌊','ウェーブ',0x2288cc,0x005599],['🌋','ボルカーノ',0xcc4422,0x991100],
+  ['❄️','スノー',0xaaddff,0x77aacc],['🦸','ヒーロー',0x2244cc,0x113388],['🦹','ヴィラン',0x440088,0x220044],
+  ['🧙','ウィザード',0x442288,0x221144],['🧝','エルフ',0x44aa44,0x227722],['🧛','ヴァンパイア',0x550022,0x330011],
+  ['🧟','ゾンビ',0x558844,0x335522],['🧞','ジン',0x2288aa,0x115577],['🧜','マーメイド',0x44aacc,0x2277aa],
+  ['🧚','フェアリー',0xff88ff,0xcc44cc],['👮','ポリス',0x2244cc,0x112299],['💂','ガード',0x223322,0x111111],
+  ['👷','ワーカー',0xffcc44,0xcc9900],['🤴','プリンス',0xffcc44,0xcc9900],['👸','プリンセス',0xff88cc,0xcc4488],
+  ['🐭','マウス',0xbbbbbb,0x888888],['🐹','ハムスター',0xddaa88,0xaa7744],['🐰','ウサギ',0xffffff,0xdddddd],
+  ['🐼','パンダ',0xffffff,0x222222],['🐨','コアラ',0x888888,0x555555],['🐷','ブタ',0xffbbcc,0xcc8899],
+  ['🌵','サボテン',0x44aa44,0x228822],['🌴','パーム',0x44bb44,0x228822],['🌸','サクラ',0xffaabb,0xcc7788],
+  ['🌺','ハイビスカス',0xff4455,0xcc1122],['🌻','ヒマワリ',0xffcc22,0xcc9900],['🎃','パンプキン',0xff7722,0xcc4400],
+  ['🎄','クリスマス',0x228833,0x115511],['🎊','パーティー',0xff88aa,0xcc4466],['🎉','タイキャノン',0xff6688,0xcc2244],
+  ['🧲','マグネット',0xcc2222,0x991111],['🔭','テレスコープ',0x445588,0x223355],['🔬','マイクロ',0x888888,0x555555],
+  ['💡','バルブ',0xffee88,0xccbb44],['💻','ラップトップ',0x444444,0x222222],['📱','スマホ',0x333333,0x111111],
+  ['🎙️','マイク',0x444444,0x222222],['🧸','テディ',0xcc8844,0x996622],['🦷','ツース',0xffffff,0xeeeeee],
+  ['🦴','ボーン',0xeeddcc,0xccbb99],['👀','アイズ',0xffffff,0xaaaaaa],['👅','タン',0xff6688,0xcc2244],
+  ['💪','マッスル',0xff9966,0xcc6633],['🍎','アップル',0xff3333,0xcc0000],['🍊','オレンジ',0xff9933,0xcc6600],
+  ['🍋','レモン',0xffee44,0xccbb00],['🍇','グレープ',0x8833cc,0x5500aa],['🍓','ストロベリー',0xff3344,0xcc0011],
+  ['🍒','チェリー',0xcc2233,0x991100],['🥭','マンゴ',0xffaa33,0xcc7700],['🥥','ナッツ',0xddcc99,0xaa9966],
+  ['🌶️','チリ',0xff2233,0xcc0011],['🥕','キャロット',0xff7733,0xcc4400],['🥦','ブロッコリ',0x44aa44,0x228822],
+  ['🍺','ビール',0xffcc44,0xcc9900],['🥂','シャンパン',0xffeecc,0xccbbaa],['🥃','ウィスキー',0xcc8833,0x996611],
+  ['☕','コーヒー',0x774422,0x553311],['🍵','マッチャ',0x44aa44,0x228822],['🧋','バブルティー',0xddaa88,0xaa7744],
+  ['💰','マネーバッグ',0xffcc00,0xcc9900],['💳','カード',0x2244aa,0x113377],['📈','チャート',0x44cc44,0x228822],
+  ['🎓','ガウン',0x222244,0x111122],['📚','ブックス',0x4488cc,0x225599],['📖','ブック',0xaabb88,0x778844],
+  ['✏️','ペンシル',0xffee44,0xccbb00],['🌡️','サーモ',0xcc4433,0x992211],['⚖️','バランス',0xaa9966,0x776644],
+  ['🔧','レンチ',0x778899,0x445566],['🔑','キー',0xffcc44,0xcc9900],['🎠','カルーセル',0xff88aa,0xcc4466],
+  ['🎡','ウィール',0xff8833,0xcc5500],['🎢','コースター',0xff4488,0xcc1144],['🎥','ムービー',0x222222,0x111111],
+];
+
+// Build 500 pool from 160 chars (cycle + random rarity)
+const POOL=[];
+for(let i=0;i<500;i++){
+  const ch=CHARS[i%CHARS.length];
+  let roll=Math.random()*100,cum=0,ri=0;
+  for(let r=0;r<RARITY.length;r++){cum+=RARITY[r].w;if(roll<cum){ri=r;break;}}
+  const R=RARITY[ri];
+  POOL.push({id:i,emoji:ch[0],name:ch[1],bodyCol:ch[2],detCol:ch[3],ri,
+    income:~~(R.iL+Math.random()*(R.iH-R.iL)),
+    price: ~~(R.pL+Math.random()*(R.pH-R.pL))});
+}
+POOL.sort((a,b)=>a.price-b.price);
+const rand=()=>POOL[~~(Math.random()*POOL.length)];
+const rare=()=>{const p=POOL.filter(m=>m.ri>=2);return p[~~(Math.random()*p.length)];};
+
+// ── REBIRTH CONFIG ───────────────────────────────────────
+// Each rebirth: cost = 500000 * 2^rebirths, unlocks +2 base slots
+const REBIRTH_BASE_COST=500000;
+function rebirthCost(n){return REBIRTH_BASE_COST*Math.pow(2,n);}
+const MAX_BASE_SLOTS_DEFAULT=6;
+
+// ── STATE ────────────────────────────────────────────────
+let money=1000,passive=0,stolen=0,running=false;
+let velY=0,onGround=true,camYaw=Math.PI,camPitch=.5,camDist=14;
+let carrying=null,carryAnimY=0,carryAnimPhase=0;
+let lockTimer=BASE_LOCK,lockCool=0,aCool=0,tutStep=0;
+let rebirthCount=0,totalEarned=0,baseSlots=MAX_BASE_SLOTS_DEFAULT;
+let zukanOwned=new Set(); // ids owned
+const keys={},mJoy={x:0,y:0},cJoy={x:0,y:0};
+let mDown=false,mLX=0,mLY=0,pinch0=null;
+
+// ── THREE ────────────────────────────────────────────────
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x0a0015);
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x0a0015,0.012);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,150);
+function onResize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+window.addEventListener('resize',onResize);onResize();
+
+scene.add(new THREE.AmbientLight(0xffffff,.55));
+const sun=new THREE.DirectionalLight(0xfff0e0,1.0);
+sun.position.set(10,28,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-60,right:60,top:60,bottom:-60,near:.5,far:110});
+scene.add(sun);
+[[0,0,0x330066,22,.3],[30,-20,0x003366,15,.25],[-30,-20,0x660033,15,.25]].forEach(([x,z,c,d,i])=>{const l=new THREE.PointLight(c,i,d);l.position.set(x,2,z);scene.add(l);});
+
+// ── UTILS ────────────────────────────────────────────────
+function blk(w,h,d,col,em=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:col,emissive:new THREE.Color(em)}));m.castShadow=m.receiveShadow=true;return m;}
+function cyl(rt,rb,h,col){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,12),new THREE.MeshLambertMaterial({color:col}));m.castShadow=m.receiveShadow=true;return m;}
+function sph(r,col){const m=new THREE.Mesh(new THREE.SphereGeometry(r,8,6),new THREE.MeshLambertMaterial({color:col}));m.castShadow=true;return m;}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
+function spr(tex,sx,sy){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));s.scale.set(sx,sy,1);return s;}
+function txtTex(text,bg,fg,w,h){w=w||256;h=h||56;const cv=document.createElement('canvas');cv.width=w;cv.height=h;const c=cv.getContext('2d');c.fillStyle=bg;rr(c,1,1,w-2,h-2,10);c.fill();c.font=`bold ${~~(h*.44)}px Segoe UI`;c.textAlign='center';c.textBaseline='middle';c.fillStyle=fg;c.fillText(text,w/2,h/2);return new THREE.CanvasTexture(cv);}
+
+const EC={};
+function eTex(e){if(EC[e])return EC[e];const cv=document.createElement('canvas');cv.width=cv.height=128;const c=cv.getContext('2d');c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=10;c.shadowOffsetX=3;c.shadowOffsetY=3;c.font='80px serif';c.textAlign='center';c.textBaseline='middle';c.fillText(e,64,70);return(EC[e]=new THREE.CanvasTexture(cv));}
+
+function lTex(def){const R=RARITY[def.ri];const cv=document.createElement('canvas');cv.width=320;cv.height=110;const c=cv.getContext('2d');c.fillStyle='rgba(0,0,10,.86)';rr(c,0,0,320,110,12);c.fill();c.strokeStyle=R.lc;c.lineWidth=2;rr(c,1,1,318,108,11);c.stroke();c.textAlign='center';c.font='900 17px Segoe UI';c.fillStyle=R.lc;c.fillText('★'+R.n+'★',160,24);c.font='bold 14px Segoe UI';c.fillStyle='#fff';c.fillText(def.name,160,44);c.font='bold 20px Segoe UI';c.fillStyle='#00ff99';c.fillText('+¥'+def.income.toLocaleString()+'/秒',160,68);c.font='bold 18px Segoe UI';c.fillStyle='#ffcc02';c.fillText('¥'+def.price.toLocaleString(),160,90);return new THREE.CanvasTexture(cv);}
+
+// ── MAKE MEME CHARACTER (unique per character type) ──────
+function mkChar(def){
+  const R=RARITY[def.ri];
+  const g=new THREE.Group();
+  const bc=def.bodyCol, dc=def.detCol;
+
+  // Each character has a unique body shape based on id%8
+  const shape=def.id%8;
+
+  if(shape===0){
+    // Roblox humanoid style
+    const body=blk(.7,1,.5,bc);g.add(body);
+    const head=blk(.72,.72,.72,bc);head.position.y=.86;g.add(head);
+    const ll=blk(.3,.6,.3,dc);ll.position.set(-.21,-.7,0);g.add(ll);
+    const lr=blk(.3,.6,.3,dc);lr.position.set(.21,-.7,0);g.add(lr);
+    const al=blk(.24,.6,.24,dc);al.position.set(-.52,.15,0);g.add(al);
+    const ar=blk(.24,.6,.24,dc);ar.position.set(.52,.15,0);g.add(ar);
+  } else if(shape===1){
+    // Round blob
+    const body=sph(.55,bc);g.add(body);
+    const lump=sph(.4,dc);lump.position.y=.55;g.add(lump);
+    const ll=cyl(.15,.18,.55,dc);ll.position.set(-.25,-.7,0);g.add(ll);
+    const lr=cyl(.15,.18,.55,dc);lr.position.set(.25,-.7,0);g.add(lr);
+  } else if(shape===2){
+    // Tall thin
+    const body=blk(.5,1.2,.4,bc);g.add(body);
+    const head=sph(.38,dc);head.position.y=.95;g.add(head);
+    const ll=blk(.22,.7,.22,dc);ll.position.set(-.17,-.85,0);g.add(ll);
+    const lr=blk(.22,.7,.22,dc);lr.position.set(.17,-.85,0);g.add(lr);
+  } else if(shape===3){
+    // Wide squat
+    const body=blk(1.0,.7,.6,bc);g.add(body);
+    const head=blk(.65,.6,.55,dc);head.position.y=.65;g.add(head);
+    const ll=blk(.32,.5,.32,bc);ll.position.set(-.3,-.55,0);g.add(ll);
+    const lr=blk(.32,.5,.32,bc);lr.position.set(.3,-.55,0);g.add(lr);
+  } else if(shape===4){
+    // Cylinder body
+    const body=cyl(.38,.42,1.0,bc);g.add(body);
+    const head=sph(.44,dc);head.position.y=.78;g.add(head);
+    const ll=cyl(.14,.16,.55,dc);ll.position.set(-.22,-.65,0);g.add(ll);
+    const lr=cyl(.14,.16,.55,dc);lr.position.set(.22,-.65,0);g.add(lr);
+  } else if(shape===5){
+    // Diamond body
+    const body=new THREE.Mesh(new THREE.OctahedronGeometry(.55),new THREE.MeshLambertMaterial({color:bc}));body.castShadow=true;g.add(body);
+    const head=sph(.38,dc);head.position.y=.78;g.add(head);
+    const ll=blk(.25,.6,.25,dc);ll.position.set(-.2,-.65,0);g.add(ll);
+    const lr=blk(.25,.6,.25,dc);lr.position.set(.2,-.65,0);g.add(lr);
+  } else if(shape===6){
+    // Torus body
+    const body=new THREE.Mesh(new THREE.TorusGeometry(.35,.18,8,16),new THREE.MeshLambertMaterial({color:bc}));body.castShadow=true;body.rotation.x=Math.PI/2;g.add(body);
+    const head=sph(.4,dc);head.position.y=.7;g.add(head);
+    const ll=blk(.24,.55,.24,dc);ll.position.set(-.2,-.6,0);g.add(ll);
+    const lr=blk(.24,.55,.24,dc);lr.position.set(.2,-.6,0);g.add(lr);
+  } else {
+    // Cone body
+    const body=new THREE.Mesh(new THREE.ConeGeometry(.5,.9,8),new THREE.MeshLambertMaterial({color:bc}));body.castShadow=true;body.position.y=.05;g.add(body);
+    const head=sph(.42,dc);head.position.y=.72;g.add(head);
+    const ll=cyl(.15,.18,.5,dc);ll.position.set(-.22,-.65,0);g.add(ll);
+    const lr=cyl(.15,.18,.5,dc);lr.position.set(.22,-.65,0);g.add(lr);
+  }
+
+  // Emoji face (always front)
+  const face=spr(eTex(def.emoji),.9,.9);face.position.set(0,.72,.42);g.add(face);
+  // Rarity glow ring
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.7,20),new THREE.MeshBasicMaterial({color:R.c,side:THREE.DoubleSide,transparent:true,opacity:.5}));
+  ring.rotation.x=-Math.PI/2;ring.position.y=-.46;g.add(ring);
+  // Label
+  const ls=spr(lTex(def),3.5,2.15);ls.position.y=2.4;g.add(ls);
+
+  g.userData={def};
+  return g;
+}
+
+// ── GROUND ───────────────────────────────────────────────
+const gc=document.createElement('canvas');gc.width=gc.height=512;const gt=gc.getContext('2d');
+gt.fillStyle='#100028';gt.fillRect(0,0,512,512);
+gt.strokeStyle='rgba(100,0,200,.22)';gt.lineWidth=1.5;
+for(let i=-512;i<1024;i+=18){gt.beginPath();gt.moveTo(i,0);gt.lineTo(i+512,512);gt.stroke();gt.beginPath();gt.moveTo(i,0);gt.lineTo(i-512,512);gt.stroke();}
+gt.strokeStyle='rgba(180,140,0,.17)';gt.lineWidth=2;for(let b=8;b<256;b+=48)gt.strokeRect(b,b,512-b*2,512-b*2);
+const gTex=new THREE.CanvasTexture(gc);gTex.wrapS=gTex.wrapT=THREE.RepeatWrapping;gTex.repeat.set(10,10);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(WORLD*2,WORLD*2),new THREE.MeshLambertMaterial({map:gTex}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+[[0,-WORLD,WORLD*2+2,1],[0,WORLD,WORLD*2+2,1],[-WORLD,0,1,WORLD*2+2],[WORLD,0,1,WORLD*2+2]].forEach(([x,z,w,d])=>{const b=blk(w,2.5,d,0x3d005e);b.position.set(x,1.25,z);scene.add(b);});
+[[0,-WORLD+.2,WORLD*2,.12],[0,WORLD-.2,WORLD*2,.12],[-WORLD+.2,0,.12,WORLD*2],[WORLD-.2,0,.12,WORLD*2]].forEach(([x,z,w,d])=>{const n=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshBasicMaterial({color:0xaa00ff}));n.rotation.x=-Math.PI/2;n.position.set(x,.01,z);scene.add(n);});
+
+// ── CONVEYOR ─────────────────────────────────────────────
+const CLEN=WORLD*2-3,CW=3.2;
+const cPlat=blk(CLEN,.4,CW,0xaa0000);cPlat.position.set(0,.2,0);scene.add(cPlat);
+const bc2=document.createElement('canvas');bc2.width=256;bc2.height=64;const bt2=bc2.getContext('2d');
+bt2.fillStyle='#770000';bt2.fillRect(0,0,256,64);bt2.fillStyle='#991100';for(let x=0;x<256;x+=16)bt2.fillRect(x,0,8,64);bt2.fillStyle='rgba(255,180,0,.32)';for(let x=0;x<256;x+=32)bt2.fillRect(x,24,14,16);
+const bTex=new THREE.CanvasTexture(bc2);bTex.wrapS=bTex.wrapT=THREE.RepeatWrapping;bTex.repeat.set(12,1);
+const bMesh=new THREE.Mesh(new THREE.PlaneGeometry(CLEN,CW),new THREE.MeshBasicMaterial({map:bTex}));
+bMesh.rotation.x=-Math.PI/2;bMesh.position.set(0,.41,0);scene.add(bMesh);
+[-1,1].forEach(s=>{const r=blk(CLEN,.22,.18,0xff2200);r.position.set(0,.52,s*CW*.5);scene.add(r);});
+const shopSp=spr(txtTex('🎭 ミームショップ','#880000','#fff',300,56),7.5,1.5);shopSp.position.set(0,3.0,CW*.5+.7);scene.add(shopSp);
+
+const convMemes=[];
+function spawnConv(sx){
+  const def=rand();const g=mkChar(def);
+  g.position.set(sx,.75,0);g.userData.spd=.45+def.ri*.08;
+  scene.add(g);convMemes.push(g);
+}
+for(let x=-CLEN/2+2;x<CLEN/2-2;x+=CONV_SP)spawnConv(x);
+
+// ── BUILD BASE ───────────────────────────────────────────
+function buildBase(px,pz,col,label,facingNorth,slotCount){
+  const g=new THREE.Group();
+  // Wider base to fit more slots
+  const bw=(slotCount||6)*2.2+2;
+  const fl=blk(bw,.3,10,col);fl.position.set(0,.15,0);g.add(fl);
+  const back=blk(bw,3.5,.4,col);back.position.set(0,1.75,-5);g.add(back);
+  const sw1=blk(.4,3.5,10,col);sw1.position.set(-bw/2,1.75,0);g.add(sw1);
+  const sw2=blk(.4,3.5,10,col);sw2.position.set(bw/2,1.75,0);g.add(sw2);
+  const rf=blk(bw,.25,10,col);rf.position.set(0,3.62,0);g.add(rf);
+  [-1,1].forEach(s=>{const p=blk(.55,3.7,.55,col);p.position.set(s*(bw/2),1.85,5);g.add(p);});
+  // Slots
+  for(let c=0;c<(slotCount||6);c++){
+    const sx=-(slotCount||6)*1.1+c*2.2+1.1;
+    const pd=blk(1.8,.2,1.8,0x1a0030);pd.position.set(sx,.42,0);g.add(pd);
+    const em=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.5),new THREE.MeshBasicMaterial({color:0x222244,transparent:true,opacity:.5,side:THREE.DoubleSide}));
+    em.rotation.x=-Math.PI/2;em.position.set(sx,.44,0);em.name='es'+c;g.add(em);
+    const ev=spr(txtTex('EMPTY','rgba(0,0,20,.7)','#444',80,26),.85,.25);
+    ev.position.set(sx,.9,0);ev.name='ev'+c;g.add(ev);
+  }
+  const sign=spr(txtTex(label,'rgba(0,0,10,.9)',col===0xff6633?'#ff9955':'#fff',300,52),6,1.2);
+  sign.position.set(0,5.2,0);g.add(sign);
+  g.rotation.y=facingNorth?Math.PI:0;
+  g.position.set(px,.01,pz);
+  scene.add(g);return g;
+}
+
+// Player base
+const pBaseGrp=buildBase(PBX,PBZ,0xff6633,'🏠 あなたの基地',true,MAX_BASE_SLOTS_DEFAULT);
+const pMemes=[],pSlots=Array(MAX_BASE_SLOTS_DEFAULT*3).fill(null); // reserve room for rebirths
+const laserMat=new THREE.MeshBasicMaterial({color:0xff3300,transparent:true,opacity:.7});
+const pLasers=[];
+for(let i=0;i<7;i++){const l=new THREE.Mesh(new THREE.BoxGeometry(.06,3.5,.06),laserMat);l.position.set(PBX-6+i*2,1.75,PBZ+5);scene.add(l);pLasers.push(l);}
+
+// ── BOT BASES ────────────────────────────────────────────
+const botBases=[];
+function spawnBot(idx){
+  if(idx>=BOT_SLOTS.length)return;
+  const [bx,bz]=BOT_SLOTS[idx];
+  const col=BOT_COLS[idx%BOT_COLS.length];
+  const name=BOT_NAMES[idx%BOT_NAMES.length];
+  const facingNorth=bz>0; // south bots face north toward conveyor
+  buildBase(bx,bz,col,name,facingNorth,4+~~(Math.random()*3));
+  const memes=[];
+  const cnt=3+~~(Math.random()*3);
+  for(let m=0;m<cnt;m++){
+    const def=rare();const g=mkChar(def);
+    // world slot pos
+    const sc=4;const sx=-(sc)*1.1+m*2.2+1.1;
+    const wx=facingNorth?(bx-sx):(bx+sx);
+    g.position.set(wx,.7,bz);
+    scene.add(g);memes.push({mesh:g,def});
+  }
+  const blMat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.7});
+  const blas=[];
+  for(let i=0;i<5;i++){const l=new THREE.Mesh(new THREE.BoxGeometry(.06,3.5,.06),blMat);l.position.set(bx-5+i*2.5,1.75,facingNorth?bz-5:bz+5);scene.add(l);blas.push(l);}
+  botBases.push({idx,bx,bz,name,col,memes,lasers:blas,locked:false,lockT:0,respCD:BOT_RESP,respTimer:BOT_RESP});
+  pushNotif('👤 '+name+' が参加！',['#ff9955','#6f6','#6bf','#d8f'][idx%4]);
+}
+
+// ── PLAYER ───────────────────────────────────────────────
+const player=new THREE.Group();scene.add(player);
+function ap(w,h,d,col,x,y,z){const m=blk(w,h,d,col);m.position.set(x,y,z);player.add(m);return m;}
+ap(.8,1,.55,0xff6b35,0,0,0);ap(.72,.72,.72,0xffcc99,0,.86,0);
+ap(.22,.28,.1,0xff6b35,-.22,1.28,0);ap(.22,.28,.1,0xff6b35,.22,1.28,0);
+[-.18,.18].forEach(sx=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.07,6,6),new THREE.MeshBasicMaterial({color:0x111}));e.position.set(sx,.9,.37);player.add(e);});
+const pll=ap(.3,.55,.3,0xff8c5a,-.22,-.78,0);
+const plr=ap(.3,.55,.3,0xff8c5a,.22,-.78,0);
+const ptail=new THREE.Mesh(new THREE.TorusGeometry(.3,.065,6,8,Math.PI*1.1),new THREE.MeshLambertMaterial({color:0xff6b35}));
+ptail.position.set(.42,-.15,-.28);ptail.rotation.set(-.4,0,.5);player.add(ptail);
+// Carry slot: above head
+const cSlot=new THREE.Group();cSlot.position.set(0,2.2,0);player.add(cSlot);
+player.position.set(PBX,.5,PBZ-2);
+
+// ── HUD ──────────────────────────────────────────────────
+const tMoney=document.getElementById('t-money'),tIncome=document.getElementById('t-income'),tRebirth=document.getElementById('t-rebirth');
+const svEl=document.getElementById('sv'),promptEl=document.getElementById('prompt');
+const carryEl=document.getElementById('carrying-hud'),bigEl=document.getElementById('big-msg');
+const lbFill=document.getElementById('lockbar-fill'),notEl=document.getElementById('notifs');
+const btnAct=document.getElementById('btn-act'),tutEl=document.getElementById('tutorial');
+const rebirthBtn=document.getElementById('rebirth-btn');
+
+function updHUD(){
+  tMoney.textContent='¥'+money.toLocaleString();
+  tIncome.textContent='+¥'+passive+'/秒';
+  tRebirth.textContent='🔄×'+rebirthCount+(rebirthCount>0?' (スロット+'+(rebirthCount*2)+')':'');
+  svEl.textContent=stolen;
+  carryEl.style.display=carrying?'block':'none';
+  const p=Math.max(0,lockTimer/BASE_LOCK*100);
+  lbFill.style.width=p+'%';
+  lbFill.style.background=lockTimer>0?'linear-gradient(90deg,#ff6b35,#ffcc02)':'#444';
+  // rebirth button
+  const cost=rebirthCost(rebirthCount);
+  if(totalEarned>=cost){
+    rebirthBtn.style.display='block';
+    rebirthBtn.textContent='🔄 リバース！(¥'+cost.toLocaleString()+')';
+  } else {
+    rebirthBtn.style.display='none';
+  }
+}
+
+let bigT;
+function showBig(m,c){bigEl.textContent=m;bigEl.style.color=c||'#ff6b35';bigEl.style.opacity='1';clearTimeout(bigT);bigT=setTimeout(()=>bigEl.style.opacity='0',1500);}
+function pushNotif(m,c){const d=document.createElement('div');d.className='notif';d.textContent=m;d.style.borderColor=c||'#fff';d.style.color=c||'#fff';notEl.prepend(d);setTimeout(()=>d.remove(),3200);}
+function setAct(show,html,col){if(!show){btnAct.style.display='none';return;}btnAct.style.display='flex';btnAct.innerHTML=html;btnAct.style.borderColor=col;btnAct.style.color=col;btnAct.style.background=col+'33';}
+
+// ── REBIRTH ──────────────────────────────────────────────
+rebirthBtn.addEventListener('click',doRebirth);
+function doRebirth(){
+  const cost=rebirthCost(rebirthCount);
+  if(totalEarned<cost)return;
+  totalEarned-=cost;rebirthCount++;
+  baseSlots+=2;
+  // extend pSlots array
+  while(pSlots.length<baseSlots)pSlots.push(null);
+  // add 2 more pedestals to player base
+  const sc=baseSlots;
+  const bw=sc*2.2+2;
+  // rebuild player base visual (simplified: just add pedestal meshes)
+  for(let c=baseSlots-2;c<baseSlots;c++){
+    const sx=-(sc)*1.1+c*2.2+1.1;
+    const pd=blk(1.8,.2,1.8,0x1a0030);
+    // in world space (base is at PBX,PBZ rotated PI)
+    pd.position.set(PBX-(sx),PBZ+.01,PBZ-PBZ); // simplified
+    scene.add(pd);
+    const em=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.5),new THREE.MeshBasicMaterial({color:0x222244,transparent:true,opacity:.5,side:THREE.DoubleSide}));
+    em.rotation.x=-Math.PI/2;em.position.set(PBX-(sx),.44,PBZ);scene.add(em);
+  }
+  showBig('🔄 リバース '+rebirthCount+'回目！スロット+'+(rebirthCount*2),'#ff88ff');
+  pushNotif('🔄 リバース！基地スロットが'+baseSlots+'個に！','#ff88ff');
+  updHUD();
+}
+
+// ── ZUKAN ────────────────────────────────────────────────
+function openZukan(){
+  const panel=document.getElementById('zukan-panel');
+  panel.style.display='flex';
+  const grid=document.getElementById('zukan-grid');
+  const prog=document.getElementById('zukan-progress');
+  grid.innerHTML='';
+  prog.textContent='図鑑: '+zukanOwned.size+' / '+CHARS.length+' 種類';
+  CHARS.forEach((ch,i)=>{
+    const cell=document.createElement('div');
+    cell.className='zk-cell'+(zukanOwned.has(ch[0])?'  got':'  locked-cell');
+    if(zukanOwned.has(ch[0])){
+      cell.innerHTML=ch[0]+'<span class="zk-name">'+ch[1]+'</span>';
+    } else {
+      cell.innerHTML='？<span class="zk-name">？？？</span>';
+    }
+    grid.appendChild(cell);
+  });
+}
+document.getElementById('zukan-btn').addEventListener('click',openZukan);
+document.getElementById('zukan-close').addEventListener('click',()=>{document.getElementById('zukan-panel').style.display='none';});
+document.addEventListener('keydown',e=>{if(e.code==='KeyG')openZukan();});
+
+// ── TUTORIAL ─────────────────────────────────────────────
+function showTut(step){
+  tutEl.innerHTML='';
+  if(step===0){const b=document.createElement('div');b.className='tut-box';b.style.cssText='bottom:215px;left:50%;transform:translateX(-50%);text-align:center;';b.innerHTML='<div class="tut-arr">👆</div><b style="color:#ffcc02">ようこそ！</b><br>左スティックで移動しよう<br>中央のコンベアへ向かえ！';tutEl.appendChild(b);}
+  else if(step===2){const b=document.createElement('div');b.className='tut-box';b.style.cssText='bottom:275px;left:50%;transform:translateX(-50%);text-align:center;';b.innerHTML='<div class="tut-arr" style="font-size:1.2rem">👇</div><b style="color:#00ff88">コンベアに近づいた！</b><br><b style="color:#ffcc02">「買う」</b>を押してミームを買おう！<br><small style="color:#888">所持金: ¥1,000</small>';tutEl.appendChild(b);}
+  else if(step===3){const b=document.createElement('div');b.className='tut-box';b.style.cssText='bottom:215px;left:50%;transform:translateX(-50%);text-align:center;';b.innerHTML='<b style="color:#00ff88">✅ 購入成功！</b><br>次は敵の基地から<br>🎭<b style="color:#ffcc02">盗もう！</b><br><small>上に持ち上げて基地へ！</small>';tutEl.appendChild(b);setTimeout(()=>{tutStep=4;tutEl.innerHTML='';},5000);}
+}
+
+// ── INPUT ─────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{keys[e.code]=true;},{passive:true});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+canvas.addEventListener('mousedown',e=>{mDown=true;mLX=e.clientX;mLY=e.clientY;});
+window.addEventListener('mouseup',()=>mDown=false);
+window.addEventListener('mousemove',e=>{if(!mDown)return;camYaw-=(e.clientX-mLX)*.004;camPitch=Math.max(.1,Math.min(1.2,camPitch+(e.clientY-mLY)*.003));mLX=e.clientX;mLY=e.clientY;});
+window.addEventListener('wheel',e=>{camDist=Math.max(4,Math.min(30,camDist+e.deltaY*.02));},{passive:true});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('touchstart',e=>{if(e.touches.length===2)pinch0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);},{passive:true});
+canvas.addEventListener('touchmove',e=>{if(e.touches.length===2&&pinch0){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);camDist=Math.max(4,Math.min(30,camDist-(d-pinch0)*.04));pinch0=d;}},{passive:true});
+canvas.addEventListener('touchend',()=>pinch0=null,{passive:true});
+
+function setupJoy(zId,kId,out,maxR){
+  const zone=document.getElementById(zId),knob=document.getElementById(kId);let tid=null;
+  function upd(ex,ey){const r=zone.getBoundingClientRect();const ox=ex-(r.left+r.width/2),oy=ey-(r.top+r.height/2);const len=Math.hypot(ox,oy),cl=Math.min(len,maxR);const nx=len>0?ox/len*cl:0,ny=len>0?oy/len*cl:0;knob.style.transform=`translate(calc(-50% + ${nx}px),calc(-50% + ${ny}px))`;out.x=len>4?ox/len:0;out.y=len>4?oy/len:0;}
+  zone.addEventListener('touchstart',e=>{e.preventDefault();tid=e.changedTouches[0].identifier;upd(e.changedTouches[0].clientX,e.changedTouches[0].clientY);},{passive:false});
+  zone.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===tid)upd(t.clientX,t.clientY);},{passive:false});
+  ['touchend','touchcancel'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();tid=null;out.x=out.y=0;knob.style.transform='translate(-50%,-50%)';},{passive:false}));
+}
+setupJoy('jmove','jmove-k',mJoy,42);
+setupJoy('jcam','jcam-k',cJoy,36);
+function tapBtn(id,cb){const el=document.getElementById(id);if(!el)return;el.addEventListener('touchstart',e=>{e.preventDefault();cb(true);},{passive:false});el.addEventListener('touchend',e=>{e.preventDefault();cb(false);},{passive:false});el.addEventListener('mousedown',()=>cb(true));el.addEventListener('mouseup',()=>cb(false));}
+tapBtn('btn-act',v=>{if(v)keys['KeyE']=true;});
+tapBtn('btn-jump',v=>keys['Space']=v);
+tapBtn('btn-lock',v=>{if(v)keys['KeyL']=true;});
+
+// ── GAME ─────────────────────────────────────────────────
+function startGame(){
+  money=1000;passive=0;stolen=0;running=true;totalEarned=0;
+  velY=0;onGround=true;camYaw=Math.PI;camPitch=.5;camDist=14;
+  carrying=null;carryAnimY=0;carryAnimPhase=0;
+  lockTimer=BASE_LOCK;lockCool=0;aCool=0;tutStep=0;
+  rebirthCount=0;baseSlots=MAX_BASE_SLOTS_DEFAULT;
+  zukanOwned=new Set();
+  while(cSlot.children.length)cSlot.remove(cSlot.children[0]);
+  botBases.forEach(b=>{b.memes.forEach(m=>scene.remove(m.mesh));b.lasers.forEach(l=>scene.remove(l));});
+  botBases.length=0;pMemes.forEach(m=>scene.remove(m));pMemes.length=0;
+  pSlots.fill(null);
+  pBaseGrp.children.forEach(c=>{if(c.name&&(c.name.startsWith('es')||c.name.startsWith('ev')))c.visible=true;});
+  convMemes.forEach(m=>scene.remove(m));convMemes.length=0;
+  for(let x=-CLEN/2+2;x<CLEN/2-2;x+=CONV_SP)spawnConv(x);
+  player.position.set(PBX,.5,PBZ-2);
+  document.getElementById('ov-end').style.display='none';
+  updHUD();showTut(0);
+  const n=3+~~(Math.random()*3);
+  for(let i=0;i<n;i++)setTimeout(()=>{if(running)spawnBot(i);},i*2500+800);
+}
+document.getElementById('btn-retry').addEventListener('click',startGame);
+
+setInterval(()=>{if(!running)return;money+=passive;totalEarned+=passive;updHUD();},1000);
+setInterval(()=>{
+  if(!running)return;
+  if(lockTimer>0){lockTimer=Math.max(0,lockTimer-1);updHUD();}
+  botBases.forEach(b=>{
+    if(b.locked&&b.lockT>0){b.lockT--;if(b.lockT<=0)b.locked=false;}
+    if(b.memes.length<3){
+      b.respCD--;
+      if(b.respCD<=0){
+        b.respCD=b.respTimer;
+        const def=rare();const g=mkChar(def);
+        const slot=b.memes.length;
+        const facingNorth=b.bz>0;
+        const sx=-(4)*1.1+slot*2.2+1.1;
+        const wx=facingNorth?(b.bx-sx):(b.bx+sx);
+        g.position.set(wx,.7,b.bz);
+        scene.add(g);b.memes.push({mesh:g,def});
+        b.locked=true;b.lockT=12;
+        pushNotif('🔄 '+b.name+' に新ミーム！','#888');
+      }
+    }
+  });
+},1000);
+
+// ── MAIN LOOP ─────────────────────────────────────────────
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(clock.getDelta(),.05);const t=Date.now()*.001;
+  if(!running){renderer.render(scene,camera);return;}
+
+  bTex.offset.x=t*.055;
+
+  // conveyor
+  for(let i=convMemes.length-1;i>=0;i--){
+    const m=convMemes[i];m.position.x+=m.userData.spd*dt;m.rotation.y+=dt*.6;
+    if(m.position.x>CLEN/2+2){scene.remove(m);convMemes.splice(i,1);const lx=convMemes.length?Math.min(...convMemes.map(c=>c.position.x)):-CLEN/2;spawnConv(lx-CONV_SP);}
+  }
+
+  // lasers
+  botBases.forEach((b,bi)=>{b.lasers.forEach(l=>{l.visible=b.locked;if(b.locked)l.material.opacity=.38+Math.sin(t*8+bi)*.28;});});
+  const pl=lockTimer>0;pLasers.forEach(l=>{l.visible=pl;if(pl)l.material.opacity=.38+Math.sin(t*8)*.28;});
+
+  // float + slow spin on base memes
+  [...botBases.flatMap(b=>b.memes.map(m=>m.mesh)),...pMemes].forEach((m,i)=>{if(m&&m.position){m.position.y=.7+Math.sin(t*1.5+i*.7)*.05;m.rotation.y+=dt*.4;}});
+  convMemes.forEach((m,i)=>{if(m&&m.position)m.position.y=.75+Math.sin(t*2+i*.5)*.04;});
+
+  // carry lift animation
+  if(carrying&&cSlot.children.length>0){
+    carryAnimPhase+=dt*3;
+    cSlot.position.y=2.2+Math.sin(carryAnimPhase)*.15;
+    cSlot.rotation.y+=dt*1.5;
+  }
+
+  if(cJoy.x)camYaw-=cJoy.x*dt*2.2;
+  if(cJoy.y)camPitch=Math.max(.12,Math.min(1.15,camPitch+cJoy.y*dt*2));
+
+  let dx=mJoy.x,dz=mJoy.y;
+  if(Math.hypot(dx,dz)<.05){dx=0;dz=0;if(keys['KeyW']||keys['ArrowUp'])dz=-1;if(keys['KeyS']||keys['ArrowDown'])dz=1;if(keys['KeyA']||keys['ArrowLeft'])dx=-1;if(keys['KeyD']||keys['ArrowRight'])dx=1;}
+  if(dx||dz){
+    const len=Math.hypot(dx,dz);dx/=len;dz/=len;
+    const fwd=new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw));
+    const right=new THREE.Vector3(Math.cos(camYaw),0,-Math.sin(camYaw));
+    const mv=fwd.multiplyScalar(-dz).add(right.multiplyScalar(dx)).normalize();
+    player.rotation.y=Math.atan2(mv.x,mv.z);
+    const spd=carrying?4.5:7;
+    player.position.x=Math.max(-WORLD+1,Math.min(WORLD-1,player.position.x+mv.x*spd*dt));
+    player.position.z=Math.max(-WORLD+1,Math.min(WORLD-1,player.position.z+mv.z*spd*dt));
+    pll.rotation.x=Math.sin(t*9)*.6;plr.rotation.x=Math.sin(t*9+Math.PI)*.6;
+    if(tutStep===0)tutStep=1;
+  } else {pll.rotation.x=0;plr.rotation.x=0;}
+  ptail.rotation.z=Math.sin(t*3)*.4+.4;
+
+  if(keys['Space']&&onGround){velY=7;onGround=false;}
+  velY-=22*dt;player.position.y+=velY*dt;
+  if(player.position.y<=.5){player.position.y=.5;velY=0;onGround=true;}
+
+  if(keys['KeyL']){keys['KeyL']=false;if(lockTimer<=0&&lockCool<=0){lockTimer=BASE_LOCK;lockCool=2;showBig('🔒 基地ロック！','#ff6b35');pushNotif('🔒 ロック '+BASE_LOCK+'秒','#ff6b35');updHUD();}}
+  if(lockCool>0)lockCool-=dt;if(aCool>0)aCool-=dt;
+
+  // interaction
+  let near=null,nearType=null;
+  let cbd=99,cbm=null;
+  for(const m of convMemes){const d=player.position.distanceTo(m.position);if(d<3.2&&d<cbd){cbd=d;cbm=m;}}
+  if(cbm){near=cbm;nearType='buy';}
+  if(!near){let bd=99,bm=null;for(const b of botBases){if(b.locked)continue;for(const e of b.memes){const d=player.position.distanceTo(e.mesh.position);if(d<2.8&&d<bd){bd=d;bm=e;}}}if(bm){near=bm;nearType='steal';}}
+  if(!near&&carrying){const d=Math.hypot(player.position.x-PBX,player.position.z-PBZ);if(d<8){near={};nearType='deposit';}}
+  if(tutStep===1&&nearType==='buy'){tutStep=2;showTut(2);}
+
+  if(near){
+    if(nearType==='buy'){const def=near.userData.def;promptEl.textContent='¥'+def.price.toLocaleString()+' 購入 ('+RARITY[def.ri].n+')';setAct(true,'💰<br>買う','#00ff88');}
+    else if(nearType==='steal'){promptEl.textContent='盗む！('+RARITY[near.def.ri].n+')';setAct(true,'🎭<br>盗む','#ffcc02');}
+    else{promptEl.textContent='基地に置く！';setAct(true,'🏠<br>置く','#ff6b35');}
+    promptEl.style.opacity='1';
+  } else {promptEl.style.opacity='0';setAct(false);}
+
+  if(keys['KeyE']&&near&&aCool<=0){
+    keys['KeyE']=false;aCool=.35;
+    if(nearType==='buy'&&!carrying){
+      const def=near.userData.def;
+      if(money>=def.price){
+        money-=def.price;passive+=def.income;stolen++;
+        totalEarned+=def.price;
+        zukanOwned.add(def.emoji);
+        placeP(def);scene.remove(near);convMemes.splice(convMemes.indexOf(near),1);
+        const lx=convMemes.length?Math.min(...convMemes.map(c=>c.position.x)):-CLEN/2;
+        setTimeout(()=>{if(running)spawnConv(lx-CONV_SP);},1500);
+        showBig(def.emoji+' 購入！+¥'+def.income+'/秒','#00ff88');
+        pushNotif('✅ '+def.emoji+' '+def.name+' ('+RARITY[def.ri].n+')','#00ff88');
+        if(tutStep===2){tutStep=3;showTut(3);}
+        updHUD();
+      } else showBig('¥'+near.userData.def.price.toLocaleString()+' 足りない！','#ff3333');
+    } else if(nearType==='steal'&&!carrying){
+      carrying=near.def;near.mesh.visible=false;
+      for(const b of botBases){const i=b.memes.indexOf(near);if(i>=0){b.memes.splice(i,1);b.locked=true;b.lockT=10;break;}}
+      while(cSlot.children.length)cSlot.remove(cSlot.children[0]);
+      // carry: mini version of the character above head
+      const R=RARITY[carrying.ri];
+      const cg=new THREE.Group();
+      const miniBody=blk(.5,.5,.5,carrying.bodyCol);cg.add(miniBody);
+      const mf=spr(eTex(carrying.emoji),.75,.75);mf.position.y=.42;cg.add(mf);
+      // glow
+      const cring=new THREE.Mesh(new THREE.RingGeometry(.38,.5,16),new THREE.MeshBasicMaterial({color:R.c,side:THREE.DoubleSide,transparent:true,opacity:.7}));
+      cring.rotation.x=-Math.PI/2;cring.position.y=-.28;cg.add(cring);
+      cSlot.add(cg);carryAnimPhase=0;
+      showBig(carrying.emoji+' 盗んだ！基地へ！','#ffcc02');
+      pushNotif('🏃 '+carrying.emoji+' '+carrying.name+' 盗んだ！','#ffcc02');
+      updHUD();
+    } else if(nearType==='deposit'&&carrying){
+      zukanOwned.add(carrying.emoji);
+      placeP(carrying);passive+=carrying.income;stolen++;
+      showBig(carrying.emoji+' 基地に置いた！+¥'+carrying.income+'/秒','#00ff88');
+      pushNotif('✅ '+carrying.emoji+' '+carrying.name+' +¥'+carrying.income+'/秒','#ff6b35');
+      carrying=null;while(cSlot.children.length)cSlot.remove(cSlot.children[0]);
+      cSlot.position.y=2.2;cSlot.rotation.y=0;
+      updHUD();
+    }
+  }
+
+  function placeP(def){
+    const slot=pSlots.findIndex(s=>s===null);if(slot>=baseSlots)return;
+    const g=mkChar(def);
+    const sc=baseSlots;const sx=-(sc)*1.1+slot*2.2+1.1;
+    g.position.set(PBX-sx,.7,PBZ);
+    scene.add(g);pMemes.push(g);pSlots[slot]=def;
+    pBaseGrp.children.forEach(c=>{if(c.name==='es'+slot||c.name==='ev'+slot)c.visible=false;});
+  }
+
+  const cx=Math.sin(camYaw)*camDist*Math.cos(camPitch);
+  const cy=Math.sin(camPitch)*camDist;
+  const cz=Math.cos(camYaw)*camDist*Math.cos(camPitch);
+  camera.position.set(player.position.x+cx,player.position.y+cy,player.position.z+cz);
+  camera.lookAt(player.position.x,player.position.y+1.5,player.position.z);
+  renderer.render(scene,camera);
+}
+
+startGame();
+loop();
+</script>
+</body>
+</html>
